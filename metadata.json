@@ -1,0 +1,6 @@
+{
+  "name": "Intek AI Studio",
+  "description": "Tactical and cinematic AI photobooth with Firebase and Gemini AI.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": []
+}

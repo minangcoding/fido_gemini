@@ -1,0 +1,41 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidSharedPhoto(data) {
+      return data.keys().hasAll(['imageData', 'createdAt']) && 
+             data.keys().size() == 2 &&
+             data.imageData is string && 
+             data.imageData.size() > 0 && 
+             data.imageData.size() <= 1048487 && // max firestore size minus overhead
+             data.createdAt is number;
+    }
+
+    match /shared_photos/{photoId} {
+      // Anyone can create a shared photo
+      allow create: if isValidId(photoId) && isValidSharedPhoto(incoming());
+      
+      // Anyone can read a shared photo using its specific ID
+      allow get: if isValidId(photoId);
+      
+      // Do not allow listing all photos
+      allow list: if false;
+      allow update, delete: if false;
+    }
+  }
+}

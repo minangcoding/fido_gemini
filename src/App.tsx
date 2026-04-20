@@ -27,7 +27,8 @@ import {
   Link2,
   Info,
   Moon,
-  Wind
+  Wind,
+  Shirt
 } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
 import { initializeApp } from 'firebase/app';
@@ -59,6 +60,42 @@ const compressImage = async (base64Str: string, maxWidth = 800, quality = 0.6): 
     };
     img.onerror = () => resolve(base64Str);
   });
+};
+
+const CamoPattern = ({ type }: { type: string }) => {
+  let colors = ['#333', '#444', '#222', '#555'];
+  if (type === 'tni_ad') colors = ['#3C4A3E', '#566649', '#635338', '#252920'];
+  if (type === 'tni_al') colors = ['#303946', '#415264', '#1E232B', '#5A6C80'];
+  if (type === 'tni_au') colors = ['#4A79A5', '#6B9CCC', '#1E3958', '#8BB6E0'];
+
+  return (
+    <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+      <defs>
+        <pattern id={`camo-${type}`} x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
+          <rect width="40" height="40" fill={colors[0]} />
+          
+          <rect x="0" y="0" width="10" height="20" fill={colors[1]} />
+          <rect x="10" y="10" width="20" height="10" fill={colors[1]} />
+          <rect x="30" y="0" width="10" height="10" fill={colors[1]} />
+          <rect x="20" y="20" width="10" height="20" fill={colors[1]} />
+          <rect x="0" y="30" width="10" height="10" fill={colors[1]} />
+          
+          <rect x="10" y="0" width="10" height="10" fill={colors[2]} />
+          <rect x="20" y="10" width="10" height="10" fill={colors[2]} />
+          <rect x="0" y="20" width="20" height="10" fill={colors[2]} />
+          <rect x="30" y="20" width="10" height="20" fill={colors[2]} />
+          <rect x="10" y="30" width="10" height="10" fill={colors[2]} />
+
+          <rect x="20" y="0" width="10" height="10" fill={colors[3]} />
+          <rect x="30" y="10" width="10" height="10" fill={colors[3]} />
+          <rect x="10" y="20" width="10" height="10" fill={colors[3]} />
+          <rect x="0" y="10" width="10" height="10" fill={colors[3]} />
+          <rect x="20" y="30" width="10" height="10" fill={colors[3]} />
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill={`url(#camo-${type})`} />
+    </svg>
+  );
 };
 
 const App = () => {
@@ -124,6 +161,7 @@ const App = () => {
       label: 'TNI ANGKATAN DARAT (AD)', 
       assetId: 'AD-01',
       description: 'Seragam PDL Malvinas NKRI dengan pola pixel digital hijau-cokelat taktis. Dilengkapi label instansi TNI AD pada dada kiri dengan bet warna natural.',
+      imageSrc: '/A D.png',
       prompt: "Indonesian Army (TNI AD) field uniform with green and brown digital pixel camouflage. REMOVE ALL PERSONAL NAMES. The name tag on the right chest must be BLANK. The left chest MUST have the 'TNI AD' label patch in natural subdued colors. DILARANG ADA NAMA ORANG. KEEP ORIGINAL FACE EXACTLY AS IS. ALWAYS PRESERVE THE AUTHENTIC AND NATURAL FACE OF THE PERSON. DILARANG MERUBAH WAJAH SAMA SEKALI. DILARANG MENGUBAH BACKGROUND."
     },
     { 
@@ -131,6 +169,7 @@ const App = () => {
       label: 'TNI ANGKATAN LAUT (AL)', 
       assetId: 'AL-04',
       description: 'Seragam PDL Loreng Teluk dengan pola gelombang digital abu-abu gelap khas Korps Marinir. Dilengkapi label instansi TNI AL pada dada kiri.',
+      imageSrc: '/A l.png',
       prompt: "Indonesian Navy (TNI AL) field uniform with grey and dark blue digital camouflage. REMOVE ALL PERSONAL NAMES. The name tag on the right chest must be BLANK. The left chest MUST have the 'TNI AL' label patch. DILARANG ADA NAMA ORANG PADA SERAGAM. KEEP ORIGINAL FACE EXACTLY AS IS. ALWAYS PRESERVE THE AUTHENTIC AND NATURAL FACE OF THE PERSON. DILARANG MERUBAH WAJAH SAMA SEKALI. DILARANG MENGUBAH BACKGROUND."
     },
     { 
@@ -138,6 +177,7 @@ const App = () => {
       label: 'TNI ANGKATAN UDARA (AU)', 
       assetId: 'AU-07',
       description: 'Seragam PDL Swa Bhuwana Paksa dengan pola digital biru langit dirgantara yang elegan. Dilengkapi label instansi TNI AU pada dada kiri.',
+      imageSrc: '/A U.png',
       prompt: "Indonesian Air Force (TNI AU) field uniform with sky blue and navy digital camouflage. REMOVE ALL PERSONAL NAMES. The name tag on the right chest must be BLANK. The left chest MUST have the 'TNI AU' label patch. DILARANG ADA NAMA ORANG PADA SERAGAM. KEEP ORIGINAL FACE EXACTLY AS IS. ALWAYS PRESERVE THE AUTHENTIC AND NATURAL FACE OF THE PERSON. DILARANG MERUBAH WAJAH SAMA SEKALI. DILARANG MENGUBAH BACKGROUND."
     },
   ];
@@ -309,10 +349,15 @@ const App = () => {
           });
 
           let base64Image = null;
+          let textResponse = "";
+          let finishReason = response.candidates?.[0]?.finishReason || "UNKNOWN";
+          
           for (const part of response.candidates?.[0]?.content?.parts || []) {
             if (part.inlineData) {
                base64Image = part.inlineData.data;
                break;
+            } else if (part.text) {
+               textResponse += part.text;
             }
           }
           
@@ -320,10 +365,20 @@ const App = () => {
             setProcessedImage(`data:image/jpeg;base64,${base64Image}`);
             setCurrentStep('result');
           } else { 
-            throw new Error('No image in response'); 
+            throw new Error(`No image. AI said: ${textResponse} | Finish Reason: ${finishReason}`); 
           }
         } catch (err: any) {
-          console.error("API Error Response:", err);
+          console.error("API Error Response:", err?.name, err?.message, err);
+          
+          let errorMessage = String(err);
+          if (err?.message) errorMessage = String(err.message);
+          if (err?.error?.message) errorMessage = String(err.error.message);
+          
+          // Do not retry if quota is exceeded
+          if (errorMessage.includes('429') || errorMessage.includes('RESOURCE_EXHAUSTED') || errorMessage.toLowerCase().includes('quota')) {
+            throw err;
+          }
+
           if (retryCount < 2) {
             await new Promise(r => setTimeout(r, Math.pow(2, retryCount) * 1000));
             return callAi(retryCount + 1);
@@ -334,7 +389,17 @@ const App = () => {
       await callAi();
     } catch (err: any) {
       console.error(err);
-      setError("Gagal mensintesis gambar. Sesi neural terputus.");
+      
+      let errorMessage = String(err);
+      if (err?.message) errorMessage = err.message;
+      if (err?.error?.message) errorMessage = err.error.message;
+      
+      if (errorMessage.includes('429') || errorMessage.includes('RESOURCE_EXHAUSTED') || errorMessage.toLowerCase().includes('quota')) {
+        setError("Kuota sistem AI (Sesi Neural) Anda telah habis (Limit Exceeded). Silakan coba lagi besok.");
+      } else {
+        setError("Gagal mensintesis gambar. Sesi neural terputus.");
+      }
+      
       setCurrentStep('mode-select');
     }
   };
@@ -496,17 +561,30 @@ const App = () => {
 
         {currentStep === 'formal-options' && (
           <div className="flex-grow p-6 flex flex-col overflow-y-auto bg-black">
-            <div className="mb-10 text-center"><h3 className="text-4xl font-black italic tracking-tighter text-white uppercase">Tactical Assets</h3><p className="text-[#00ffcc]/60 text-[10px] uppercase font-bold tracking-[0.3em] mt-2">Pilih Unit Pasukan</p></div>
+            <div className="mb-10 text-center"><h3 className="text-5xl font-black tracking-tighter text-[#00E5FF] drop-shadow-[0_0_15px_rgba(0,229,255,0.4)] uppercase">CHOOSE YOUR UNIFORM</h3><p className="text-white/60 text-xs font-medium tracking-wide mt-3">Select the core asset. Let's bring the subject into focus with maximum detail</p></div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto w-full mb-12">
               {FORMAL_OPTIONS.map(opt => (
-                <button key={opt.id} onClick={() => processImage(opt.id)} className="group relative bg-[#0a0a0a] border border-white/10 rounded-[32px] hover:border-[#00ffcc] hover:bg-[#00ffcc]/5 transition-all flex flex-col p-8 h-auto min-h-[16rem] shadow-[0_0_20px_rgba(0,0,0,0.5)] text-left">
-                  <div className="mb-4 bg-[#00ffcc]/10 w-12 h-12 rounded-xl flex items-center justify-center text-[#00ffcc]/40 group-hover:text-[#00ffcc] transition-all"><Shield size={24} /></div>
-                  <div className="flex-grow"><h4 className="font-black text-lg italic text-white group-hover:text-[#00ffcc] transition-colors uppercase tracking-tighter leading-tight mb-3">{opt.label}</h4><p className="text-white/40 text-[11px] leading-relaxed group-hover:text-white/60 transition-colors uppercase tracking-tight font-medium">{opt.description}</p></div>
-                  <div className="mt-6 flex items-center justify-between opacity-20 group-hover:opacity-100 transition-all"><span className="text-[8px] font-black uppercase tracking-[0.2em]">Deploy Uniform</span><ChevronRight size={20} className="text-[#00ffcc] group-hover:translate-x-1 transition-all" /></div>
+                <button key={opt.id} onClick={() => processImage(opt.id)} className="group relative bg-[#181a1f] border border-white/5 rounded-sm hover:border-[#00E5FF] hover:bg-[#1f2229] transition-all flex flex-col h-[500px] overflow-hidden shadow-2xl text-left">
+                  {/* Subtle corner accents */}
+                  <div className="absolute top-4 left-4 w-4 h-4 border-t border-l border-white/10 group-hover:border-[#00E5FF]/50 transition-colors z-20"></div>
+                  <div className="absolute top-4 right-4 w-4 h-4 border-t border-r border-white/10 group-hover:border-[#00E5FF]/50 transition-colors z-20"></div>
+                  
+                  {/* Image Area - The user's imageSrc properties will automatically be rendered here. */}
+                  <div className="w-full h-full absolute inset-0 bg-gradient-to-b from-[#2a2d35] to-[#181a1f] flex items-center justify-center pt-8 pb-32">
+                     <img src={opt.imageSrc} alt={opt.label} className="w-full h-full object-contain opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500" />
+                  </div>
+                  
+                  {/* Bottom Text Area */}
+                  <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-[#0a0a0c] via-[#111316] to-transparent flex flex-col justify-end min-h-[140px] z-20">
+                    <p className="text-[#00E5FF] text-[10px] mb-2 font-bold tracking-widest uppercase">ASSET ID: {opt.assetId}</p>
+                    <h4 className="font-black text-xl text-white group-hover:text-white transition-colors tracking-tight leading-tight uppercase shadow-black drop-shadow-md">
+                      {opt.label.split(' (')[0]} <br/> <span className="text-white/70">({opt.label.split(' (')[1] || ''}</span>
+                    </h4>
+                  </div>
                 </button>
               ))}
             </div>
-            <button onClick={() => setCurrentStep('mode-select')} className="mt-auto mb-12 py-4 text-white/30 hover:text-[#00ffcc] font-black text-[10px] tracking-[0.4em] transition-all uppercase text-center">Return to Operator Menu</button>
+            <button onClick={() => setCurrentStep('mode-select')} className="mt-auto mb-12 py-4 text-white/30 hover:text-[#00E5FF] font-medium text-xs tracking-widest transition-all uppercase text-center">Return to Operator Menu</button>
           </div>
         )}
 
@@ -590,7 +668,7 @@ const App = () => {
           <div className="bg-[#0a0a0a] border border-red-500/30 p-12 rounded-[40px] max-w-md w-full text-center shadow-[0_0_50px_rgba(239,68,68,0.1)]">
             <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-8 border border-red-500/20"><X size={48} className="text-red-500" /></div>
             <h4 className="text-3xl font-black italic text-white mb-3 uppercase tracking-tighter">System Malfunction</h4>
-            <p className="text-white/40 text-sm mb-10 leading-relaxed font-medium uppercase tracking-tight">{error}</p>
+            <p className="text-white/60 text-sm mb-10 leading-relaxed font-medium uppercase tracking-tight">{error}</p>
             <button onClick={() => { setError(null); setCurrentStep('landing'); }} className="w-full py-5 bg-red-600 text-white font-black rounded-2xl hover:bg-red-500 transition-all uppercase tracking-widest shadow-xl shadow-red-900/20">Reboot Studio</button>
           </div>
         </div>

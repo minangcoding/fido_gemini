@@ -19,10 +19,7 @@ service cloud.firestore {
 
     function isValidSharedPhoto(data) {
       return data.keys().hasAll(['imageData', 'createdAt']) && 
-             data.keys().size() == 2 &&
              data.imageData is string && 
-             data.imageData.size() > 0 && 
-             data.imageData.size() <= 1048487 && // max firestore size minus overhead
              data.createdAt is number;
     }
 
